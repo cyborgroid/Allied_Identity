@@ -1,0 +1,15 @@
+# Rust
+core/target/
+
+# .NET
+companion/**/bin/
+companion/**/obj/
+
+# Python
+__pycache__/
+*.pyc
+
+# 로컬 모델·생성된 팩 (용량이 크고 사용자별)
+*.gguf
+*.gguf.part
+*.jsonl.tmp

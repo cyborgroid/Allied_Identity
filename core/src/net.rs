@@ -153,8 +153,16 @@ pub fn analyze(r: &NetReport) -> Vec<String> {
     w
 }
 
+/// 외부 명령 실행. 출력 번역(예: nmcli 의 "yes" → "예")을 막기 위해 메시지 로캘만 C 로 고정하고,
+/// 문자 집합(UTF-8 SSID 등)은 시스템 설정을 그대로 둔다.
 fn run(cmd: &str, args: &[&str]) -> Option<String> {
-    let out = Command::new(cmd).args(args).output().ok()?;
+    let out = Command::new(cmd)
+        .args(args)
+        .env_remove("LC_ALL")
+        .env_remove("LANGUAGE")
+        .env("LC_MESSAGES", "C")
+        .output()
+        .ok()?;
     out.status.success().then(|| String::from_utf8_lossy(&out.stdout).into_owned())
 }
 

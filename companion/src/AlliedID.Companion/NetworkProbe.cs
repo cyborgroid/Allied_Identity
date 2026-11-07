@@ -120,12 +120,17 @@ public static class NetworkProbe
     {
         try
         {
-            using var p = Process.Start(new ProcessStartInfo(file, args)
+            // 출력 번역을 막기 위해 메시지 로캘만 C 로 고정 (문자 집합은 유지).
+            var psi = new ProcessStartInfo(file, args)
             {
                 RedirectStandardOutput = true,
                 RedirectStandardError = true,
                 UseShellExecute = false,
-            });
+            };
+            psi.Environment.Remove("LC_ALL");
+            psi.Environment.Remove("LANGUAGE");
+            psi.Environment["LC_MESSAGES"] = "C";
+            using var p = Process.Start(psi);
             if (p is null) return null;
             var output = p.StandardOutput.ReadToEnd();
             p.WaitForExit(5000);
