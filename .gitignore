@@ -13,3 +13,6 @@ __pycache__/
 *.gguf
 *.gguf.part
 *.jsonl.tmp
+
+# 에디터 설정·캐시 (VS Code IntelliSense DB는 1GB 이상)
+.vscode/
