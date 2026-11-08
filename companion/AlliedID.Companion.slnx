@@ -1,6 +1,0 @@
-<Solution>
-  <Folder Name="/src/">
-    <Project Path="src/AlliedID.Companion/AlliedID.Companion.csproj" />
-    <Project Path="src/AlliedID.Identity/AlliedID.Identity.csproj" />
-  </Folder>
-</Solution>

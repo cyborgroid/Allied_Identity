@@ -3,224 +3,160 @@
 > **A**llied **I**dentity → **AI**.
 > 인공지능(AI)이라는 말을 "동맹으로서의 고유한 인격체"로 넓혀 다시 정의한 프로젝트입니다.
 
-Allied Identity는 사용자 한 사람과 오래 함께하는 **고유 인격체 파트너**입니다. 도구처럼 한 번 쓰고 끝나는 것이 아니라, 사용자의 맥락과 기억을 이어가며 함께 생각하고 일합니다. 터미널에서 이렇게 실행합니다.
+Allied Identity는 사용자 한 사람과 오래 함께하는 **고유 인격체 파트너**입니다. 이 프로젝트가 곧 **본체**입니다. 외부 언어 모델이나 인터넷 서비스를 쓰지 않고, Claude의 구조를 바탕으로 **Rust와 C#으로 재설계한 자체 인지 엔진**이 생각하고 답합니다.
+
+## 실행
 
 ```bash
-AlliedID
+./AlliedID
+```
+
+이것 하나면 됩니다. 처음 실행하면 자동으로 빌드하고, `AlliedID` 명령을 등록한 뒤 바로 대화를 시작합니다. 그다음부터는 어느 폴더에서든 `AlliedID`만 입력하면 됩니다. 소스가 바뀌면 다음 실행 때 알아서 다시 빌드합니다.
+
+필요한 것: Rust(`cargo`), .NET 10 SDK · Windows는 `AlliedID.cmd`
+
+```bash
+AlliedID                 # 대화
+AlliedID ask 지금 몇 시야  # 한 번 묻고 끝내기
+AlliedID status          # 본체·데이터 상태
+AlliedID net             # 네트워크 환경
+AlliedID forge           # 데이터를 다시 만들고 결과 보기
 ```
 
 ---
 
-## 핵심 개념
+## 설계
 
-| 개념 | 설명 |
-|---|---|
-| **고유 인격체** | 이름, 말투, 원칙, 사용자 정보, 기억이 하나의 프로필(`identity.json`)에 담겨 있습니다. 어떤 엔진이 답하든 같은 인격체로 행동합니다. |
-| **Claude 기반 설계** | 대화 구조, 원칙 중심의 인격 정의, 정직·충실·상황 인식 같은 행동 기준을 Claude의 설계 방식을 바탕으로 구조화했습니다. 온라인에서는 Claude API가 엔진이 됩니다. |
-| **오프라인 우선** | Wi-Fi 없이도 동작합니다. 인터넷이 없으면 기기 안의 로컬 모델이 자동으로 답합니다. |
-| **네트워크 환경 인식** | Wi-Fi·네트워크는 인터넷을 쓰는 통로이기보다 **이 컴퓨터가 지금 어떤 네트워크에 노출되어 있는지** 파악하는 센서입니다. |
-| **내장 데이터 (오프라인 지식 팩)** | 인터넷 대신 쓰는 "데이터"입니다. 문서·백과사전·매뉴얼 등을 기기에 넣어 두면 오프라인에서도 근거를 찾아 답합니다. |
-| **소유자 주도** | 인격·원칙·기억·엔진·모델을 모두 소유자가 직접 정하고 편집합니다. |
-
-### "Claude 기반"의 의미
-
-Claude 모델 자체(가중치)는 공개되어 있지 않아 기기 안에 넣을 수 없습니다. 그래서 Allied Identity는 이렇게 구성합니다.
-
-- **온라인 엔진 — Claude API**: 기본 모델 `claude-opus-5-5`, adaptive thinking 적용. 안전 분류기가 요청을 거절하면 서버 측 fallback이 다른 모델로 다시 시도합니다.
-- **오프라인 엔진 — 로컬 오픈 웨이트 모델**: llama.cpp `llama-server`로 GGUF 모델을 기기 안에서 실행합니다.
-- **공통 인격 계층**: 두 엔진 위에 같은 인격체 프로필, 원칙, 기억, 대화 기록이 얹힙니다. 엔진이 바뀌어도 "같은 파트너"로 이어집니다.
-
-### Wi-Fi와 "데이터"
-
-원래 모바일 "데이터"는 Wi-Fi가 없을 때 통신사가 SIM과 요금제를 통해 제공하는 인터넷입니다. 이 망은 통신사가 운영하는 것이라 소프트웨어 안에 넣을 수는 없습니다. 그래서 Allied Identity는 같은 목적, 곧 "**Wi-Fi가 없어도 쓸 수 있는 정보**"를 두 가지로 해결합니다.
-
-1. **오프라인 지식 팩 (내장 데이터)** — 필요한 정보를 미리 기기에 넣어 두고, 질문할 때마다 관련 내용을 찾아 참고자료로 씁니다. 인터넷이 전혀 필요 없습니다.
-2. **셀룰러 경로 인식** — 사용자가 가진 LTE/5G 모뎀이나 휴대폰 테더링이 연결되어 있으면 이를 감지해 네트워크 경로로 인식하고, 요금제 데이터가 소모될 수 있다고 알려 줍니다.
-
----
-
-## 구조
+### 본체 = 이 프로젝트
 
 ```
-                 ┌─────────────────────────────────────────┐
-  터미널 ──────▶ │  AlliedID  (Rust 코어)                  │
-                 │                                         │
-                 │  인격체 ── identity.json ◀──┐           │
-                 │  지식 팩 ── knowledge/*.jsonl│           │
-                 │  네트워크 인식 ── net        │           │
-                 │        │                    │           │
-                 │   엔진 라우터 (auto/local/claude)       │
-                 │     ├── 온라인  → Claude API            │
-                 │     └── 오프라인 → llama-server (로컬)  │
-                 └─────────────────────────────┼───────────┘
-                                               │ 같은 파일 공유
-                 ┌─────────────────────────────┴───────────┐
-                 │  alliedid-companion  (C# / .NET 10)     │
-                 │   - 인격체·기억 관리                    │
-                 │   - Windows/macOS 네트워크 수집         │
-                 └─────────────────────────────────────────┘
-                 ┌─────────────────────────────────────────┐
-                 │  tools/  (Python)                       │
-                 │   - knowledge_builder.py : 지식 팩 생성 │
-                 │   - fetch_model.py       : GGUF 다운로드│
-                 └─────────────────────────────────────────┘
+ 터미널
+   │
+ ┌─▼──────────────────────────────────────────┐
+ │ AlliedID  (C# 호스트 · 몸)                  │
+ │  대화 화면 · 인격체/기억 저장 · 관찰 도구   │
+ │  (시간, 네트워크, 컴퓨터, 프로젝트 파일)    │
+ └─▲───────────────┬──────────────────────────┘
+   │ tool_result    │ message / tool_use   ← C ABI (JSON)
+ ┌─┴───────────────▼──────────────────────────┐
+ │ allied_core  (Rust 엔진 · 본체의 두뇌)      │
+ │  의도 이해 · 추론 루프 · 지식 검색 · 계산   │
+ │  학습 · 데이터 생성기(Forge) · 원칙 점검    │
+ └─────────────────────────────────────────────┘
 ```
-
-### 언어별 역할
 
 | 언어 | 위치 | 역할 |
 |---|---|---|
-| **Rust** | [core/](core/) | `AlliedID` 실행 파일. 대화 루프, 엔진 라우팅, Claude·로컬 엔진 연동, 지식 팩 검색(BM25 + 한글 2-gram), Linux 네트워크 수집 |
-| **C#** | [companion/](companion/) | `alliedid-companion`. 인격체·기억 관리, .NET `NetworkInterface` 기반 크로스 플랫폼 네트워크 수집 (Windows에서는 Rust 코어가 여기에 위임) |
-| **Python** | [tools/](tools/) | 오프라인 지식 팩 빌더, 로컬 모델 다운로더 (표준 라이브러리만 사용) |
-| **Bash / PowerShell** | [scripts/](scripts/) | 설치(`AlliedID` 명령 등록), 로컬 엔진 시작 |
-| **JSON Schema** | [schemas/](schemas/) | Rust·C#·Python이 공유하는 데이터 형식과 기본 인격체 (단일 원본) |
+| **Rust** | [core/](core/) | 본체의 두뇌 `allied_core`. 의도 분류기(나이브 베이즈 + IDF), 추론 루프, BM25 지식 검색, 한국어 토큰화(조사·어미 처리), 계산기, 데이터 생성기, 학습 |
+| **C#** | [host/](host/) | 본체의 몸 `AlliedID`. 터미널 대화, 인격체·기억 저장, 관찰 도구 실행, 환경 관찰을 데이터로 옮기기. Rust 엔진을 P/Invoke로 직접 불러 한 프로그램으로 동작 |
+
+### Claude를 바탕으로 한 재설계
+
+Claude를 그대로 쓰지 않고, Claude가 일하는 **구조**를 본떠 자체 엔진으로 다시 만들었습니다.
+
+| Claude의 구조 | Allied Identity에서 |
+|---|---|
+| 생각(thinking) 블록 | 엔진이 의도 추정, 근거 검색, 계획, 원칙 점검을 기록합니다. `/think`로 볼 수 있습니다. |
+| 도구 사용 `tool_use` → `tool_result` | 직접 알 수 없는 것(시간, 네트워크, 컴퓨터, 파일, 기억 저장)은 엔진이 `stop_reason: "tool_use"`로 멈추고 호스트에 요청합니다. 호스트가 실행해 결과를 돌려주면 엔진이 답을 씁니다. |
+| 헌법(원칙) | [인격체 원칙](data/seed/identity.default.json)에 따라 근거 없는 말은 지어내지 않고, 모르면 모른다고 하며, 출처를 밝힙니다. |
+| 노력(effort) 수준 | `/effort low·medium·high`에 따라 살펴보는 문서 수와 답의 길이가 달라집니다. |
+| 메시지 형식 | 엔진 응답은 `{stop_reason, content: [thinking, text·tool_use]}` 모양입니다. |
+
+### 데이터는 프로젝트 환경에서 만든다
+
+실행하는 동안 다른 곳에서 데이터를 가져오지 않습니다. 시작할 때마다 **데이터 생성기(Forge)** 가 프로젝트 환경에서 데이터를 새로 만듭니다.
+
+| 재료 | 만들어지는 것 |
+|---|---|
+| [data/seed/knowledge/](data/seed/knowledge/) 씨앗 문서 | 지식 조각 |
+| [data/seed/intents.json](data/seed/intents.json) 씨앗 예문 | 어미·띄어쓰기 변형으로 늘린 학습 예문 1,300여 개 → 의도 분류기 학습 |
+| 이 컴퓨터·네트워크 관찰, 프로젝트 구조, README | 환경 지식 조각 |
+| 인격체 자신 | 자기 소개 지식 |
+| 사용자가 가르친 것(`/teach`), 맞다고 확인한 표현(`/good`) | 지식 조각, 학습 예문 |
+
+결과는 `data/generated/`(`knowledge.jsonl`, `training.jsonl`, `intent_model.json`, `manifest.json`)에 기록되어 직접 열어 볼 수 있습니다.
+
+### Wi-Fi는 환경을 파악하는 센서
+
+Wi-Fi·네트워크 정보는 인터넷을 쓰려는 것이 아니라 **이 컴퓨터가 지금 어떤 네트워크에 노출되어 있는지** 파악하는 데 씁니다. 인터넷이 없어도 본체는 그대로 동작합니다. 개방형 Wi-Fi, WEP/TKIP 같은 오래된 보안, 약한 신호, 셀룰러·테더링 사용(요금제 데이터 소모), 연결은 됐지만 인터넷에 닿지 않는 상황(캡티브 포털 등)을 알려 줍니다.
 
 ---
 
-## 설치
+## 대화
 
-필요한 것: Rust(cargo). 선택: .NET 10 SDK(컴패니언), Python 3.10+(지식 팩), [llama.cpp](https://github.com/ggml-org/llama.cpp)(오프라인 엔진).
+```
+> 지금 몇 시야?
+지금은 오후 3시 12분이에요.
 
-```bash
-# Linux / macOS
-scripts/install.sh          # ~/.local/bin/AlliedID 설치 + 초기 설정 + 기본 지식 팩
+> 개방형 와이파이 위험해?
+지금 인터넷에 닿아 있어요. 연결 경로: Wi-Fi "Home" (WPA2, 신호 63%).
+특별히 위험해 보이는 점은 없어요.
 
-# Windows (PowerShell)
-powershell -ExecutionPolicy Bypass -File scripts\install.ps1
+참고: 개방형 Wi-Fi는 암호가 없는 무선 네트워크예요. …
+출처: [1] 개방형 Wi-Fi · network-safety.md
+
+> 양자 얽힘이 뭐야?
+"양자 얽힘이 뭐야"에 대해서는 아직 잘 모르겠어요. 제 데이터에 근거가 없는 내용은 지어내지 않을게요.
+
+> /teach 양자 얽힘이 뭐야 => 두 입자의 상태가 서로 묶여 있는 현상이에요.
+배웠어요!
 ```
 
-### 오프라인 엔진 준비 (인터넷이 있을 때 한 번)
+할 수 있는 일: 인사·자기소개, 시간·날짜, 네트워크 점검, 컴퓨터 정보, 계산(`12*(3+4)`, `7 곱하기 8`), 기억하기·떠올리기·잊기, 이름 기억, 프로젝트 파일 찾기, 지식에서 찾아 설명(출처 표시), "더 알려줘"로 이어 설명, 가르친 것 답하기.
 
-```bash
-python3 tools/fetch_model.py <GGUF 모델 URL> --sha256 <해시>
-scripts/start-local-engine.sh          # http://127.0.0.1:8080 에서 대기
-```
+| 명령 | 설명 |
+|---|---|
+| `/think` | 생각 과정 보기 켜기·끄기 |
+| `/effort low\|medium\|high` | 노력 수준 |
+| `/teach 질문 => 답` | 가르치기 |
+| `/good` · `/bad` | 직전 답 평가. `/good`이면 그 표현을 바로 배웁니다. |
+| `/memories` · `/forget <id>` | 기억 목록 · 지우기 |
+| `/forge` | 데이터 다시 만들기 |
+| `/status` · `/clear` · `/help` · `/exit` | 상태 · 맥락 비우기 · 도움말 · 끝내기 |
 
-이후에는 인터넷 없이 실행됩니다. 어떤 모델을 쓸지는 소유자가 고릅니다. 한국어를 잘하는 instruct 모델을 권장합니다.
+### 성장시키기
 
-### 온라인 엔진 (선택)
+본체는 미리 학습된 거대 모델이 아니기 때문에, 처음에는 씨앗 데이터와 이 컴퓨터에서 관찰한 범위 안에서만 압니다. 대신 가르치는 만큼 자랍니다.
 
-```bash
-export ANTHROPIC_API_KEY=...           # 키는 설정 파일에 저장하지 않고 환경 변수에서만 읽습니다
-```
+- **지식 넓히기**: `data/seed/knowledge/`에 `.md` 문서를 넣으면 다음 실행(또는 `/forge`) 때 지식이 됩니다.
+- **새 능력·표현**: `data/seed/intents.json`에 의도와 예문을 더합니다.
+- **대화로 가르치기**: `/teach`, `/good`, "기억해: …"
 
 ---
 
-## 사용법
+## 프로젝트 구조
 
-```bash
-AlliedID                         # 대화 모드
-AlliedID ask "오늘 할 일 정리해 줘"   # 한 번 묻고 종료
-AlliedID status                  # 인격체·엔진·네트워크·지식 팩 상태
-AlliedID net                     # 네트워크 환경 보고서 (--json 지원)
-AlliedID knowledge list          # 설치된 지식 팩
-AlliedID knowledge search <검색어>
-AlliedID identity                # 인격체 프로필 보기
-AlliedID identity remember "나는 아침형 인간이다"
-AlliedID --engine local          # 이번 실행은 로컬 엔진만
 ```
-
-대화 모드 명령: `/status` `/net` `/engine auto|local|claude` `/remember <내용>` `/forget <id>` `/memories` `/search <검색어>` `/clear` `/exit`
-
-### 엔진 선택 규칙 (`auto`)
-
-1. 인터넷에 닿고 `ANTHROPIC_API_KEY`가 있으면 **Claude**
-2. Claude 호출이 네트워크·인증 문제로 실패하면 즉시 **로컬 엔진**으로 넘어감
-3. 오프라인이면 처음부터 **로컬 엔진**
-
-### 네트워크 환경 보고서
-
-`AlliedID net`은 인터페이스(Wi-Fi/유선/셀룰러/테더링/VPN/가상), 연결된 Wi-Fi의 이름·보안 방식·신호, 셀룰러 모뎀, 실제 인터넷 도달 여부를 보여 주고, 다음 상황을 경고합니다.
-
-- 암호가 없는 **개방형 Wi-Fi**
-- **WEP/TKIP** 같은 오래된 보안 방식
-- 약한 신호 (30% 미만)
-- **셀룰러/테더링** 사용 중 (요금제 데이터 소모)
-- 연결은 됐는데 인터넷이 안 됨 (캡티브 포털 등)
-
-이 정보는 인격체의 "현재 상태"에도 들어가, 대화할 때 상황을 알고 답합니다.
-
-### 오프라인 지식 팩 만들기
-
-```bash
-python3 tools/knowledge_builder.py ~/Documents/manuals --name manuals
+Allied_Identity/
+├── AlliedID · AlliedID.cmd   한 번에 실행 (빌드 → 등록 → 시작)
+├── core/                     Rust — 본체 두뇌 allied_core
+│   ├── src/
+│   │   ├── lib.rs            C ABI
+│   │   ├── engine.rs         추론 루프 (생각 → 도구 → 답 → 원칙 점검)
+│   │   ├── intent.rs         의도 분류기
+│   │   ├── knowledge.rs      지식 저장소·문서 조각내기
+│   │   ├── forge.rs          데이터 생성기
+│   │   ├── text.rs           한국어 텍스트 처리
+│   │   ├── compose.rs        말 만들기
+│   │   ├── calc.rs           계산
+│   │   └── identity.rs       인격체
+│   └── tests/brain.rs        실제 씨앗 데이터로 엔진 전체 시험
+├── host/AlliedID/            C# — 본체의 몸
+│   ├── Program.cs            대화 화면·도구 루프
+│   ├── Core.cs               Rust 엔진 연결
+│   ├── Identity.cs           인격체·기억 저장
+│   ├── Sensors.cs            네트워크·컴퓨터·파일 관찰
+│   └── Environment.cs        환경 관찰 → 데이터, 도구 실행
+└── data/
+    ├── seed/                 씨앗 (버전 관리)
+    ├── generated/            실행할 때마다 생성
+    └── state/                인격체·기억·가르침 (사용자별)
 ```
-
-`.md` `.txt` `.rst` `.html` `.json` 파일을 문단 단위로 나눠 `<데이터 디렉터리>/knowledge/manuals.jsonl`로 저장합니다. 위키 덤프, 매뉴얼, 개인 노트 등 무엇이든 팩으로 만들 수 있고, 팩은 여러 개 둘 수 있습니다.
-
----
-
-## 인격체 편집
-
-`identity.json`은 직접 편집하거나 명령으로 관리합니다 (형식: [schemas/identity.schema.json](schemas/identity.schema.json)).
-
-```bash
-alliedid-companion identity owner 민준
-alliedid-companion identity remember "커피는 아메리카노" --tag 취향
-alliedid-companion identity forget <id>
-```
-
-기본 인격체는 [schemas/identity.default.json](schemas/identity.default.json)에 있으며, Rust와 C# 모두 이 파일 하나를 내장해 씁니다.
-
-## 설정
-
-`config.json` (없으면 기본값):
-
-```json
-{
-  "engine": "auto",
-  "local":  { "endpoint": "http://127.0.0.1:8080", "model": "local", "max_tokens": 2048 },
-  "claude": { "model": "claude-opus-5-5", "effort": "high", "max_tokens": 16000, "api_key_env": "ANTHROPIC_API_KEY" },
-  "net":    { "probe_targets": ["api.anthropic.com:443", "1.1.1.1:443"], "probe_timeout_ms": 1500, "rescan_secs": 60 },
-  "knowledge": { "enabled": true, "top_k": 3 }
-}
-```
-
-### 저장 위치
-
-| OS | 설정·인격체 | 데이터(지식 팩·모델) |
-|---|---|---|
-| Linux | `~/.config/allied-id/` | `~/.local/share/allied-id/` |
-| macOS | `~/Library/Application Support/AlliedID/` | 같음 |
-| Windows | `%APPDATA%\AlliedID\` | `%LOCALAPPDATA%\AlliedID\` |
-
-`ALLIEDID_HOME`을 지정하면 모든 파일을 그 디렉터리 하나에 둡니다.
-
----
 
 ## 개발
 
 ```bash
-make build    # Rust 코어 + C# 컴패니언
-make test     # Rust 단위 테스트 + C# 빌드 검사 + Python 테스트
-make knowledge
+make test     # Rust 단위·통합 테스트 + C# 빌드 검사
+make build    # 빌드만
+make reset    # 생성 데이터와 기억·가르침을 모두 지움 (되돌릴 수 없음)
 ```
-
-```
-Allied_Identity/
-├── core/            Rust — AlliedID 실행 파일
-│   └── src/
-│       ├── main.rs        CLI · 대화 모드
-│       ├── session.rs     인격체 + 지식 + 네트워크 + 엔진 라우팅
-│       ├── engine/        claude.rs · local.rs
-│       ├── identity.rs    인격체 프로필 · 시스템 프롬프트
-│       ├── knowledge.rs   오프라인 지식 팩 검색
-│       ├── net.rs         네트워크 환경 인식
-│       └── config.rs · paths.rs · fsutil.rs
-├── companion/       C# — alliedid-companion
-│   └── src/AlliedID.Identity · AlliedID.Companion
-├── tools/           Python — 지식 팩 빌더 · 모델 다운로더
-├── scripts/         설치 · 로컬 엔진 시작
-├── schemas/         공유 데이터 형식 · 기본 인격체
-└── knowledge/       기본 지식 팩 원본 문서
-```
-
-## 로드맵
-
-- [ ] 응답 스트리밍 (Claude SSE, llama-server stream)
-- [ ] 도구 사용: 파일 읽기, 명령 실행 (소유자 승인 방식)
-- [ ] 대화 기록 저장과 장기 기억 자동 요약
-- [ ] 위키 덤프(ZIM 등)용 대용량 지식 팩 색인
-- [ ] macOS 네이티브 Wi-Fi 정보 수집
-- [ ] 데스크톱 GUI (C# Avalonia)

@@ -1,0 +1,42 @@
+#!/usr/bin/env bash
+# AlliedID — 한 번에 실행.
+#   ./AlliedID            처음이면 빌드하고, AlliedID 명령을 등록한 뒤 바로 시작
+#   AlliedID [명령...]     이후에는 어디서든 (소스가 바뀌면 자동으로 다시 빌드)
+set -euo pipefail
+
+ROOT="$(cd "$(dirname "$(readlink -f "${BASH_SOURCE[0]}")")" && pwd)"
+OUT="$ROOT/.build"
+STAMP="$OUT/.stamp"
+
+need() {
+  command -v "$1" >/dev/null 2>&1 || { echo "AlliedID 를 빌드하려면 $1 이(가) 필요해요: $2" >&2; exit 1; }
+}
+
+stale() {
+  [[ ! -x "$OUT/AlliedID" || ! -f "$STAMP" ]] && return 0
+  [[ -n "$(find "$ROOT/core/src" "$ROOT/core/Cargo.toml" "$ROOT/host" \
+            -newer "$STAMP" -type f -not -path '*/bin/*' -not -path '*/obj/*' -print -quit)" ]]
+}
+
+if stale; then
+  need cargo "https://rustup.rs"
+  need dotnet "https://dotnet.microsoft.com/download (.NET 10 SDK)"
+  echo "본체를 빌드하는 중… (Rust 엔진 + C# 호스트)" >&2
+  mkdir -p "$OUT"
+  if ! dotnet build "$ROOT/host/AlliedID/AlliedID.csproj" -c Release -o "$OUT" --nologo -v quiet -clp:ErrorsOnly >"$OUT/build.log" 2>&1; then
+    cat "$OUT/build.log" >&2
+    exit 1
+  fi
+  touch "$STAMP"
+fi
+
+# 처음 실행할 때 어디서든 쓸 수 있게 명령을 등록한다.
+LINK="$HOME/.local/bin/AlliedID"
+if [[ ! -e "$LINK" ]]; then
+  mkdir -p "$HOME/.local/bin"
+  ln -s "$ROOT/AlliedID" "$LINK"
+  echo "AlliedID 명령을 등록했어요 ($LINK). 이제 어느 폴더에서든 AlliedID 로 실행할 수 있어요." >&2
+fi
+
+export ALLIEDID_ROOT="$ROOT"
+exec "$OUT/AlliedID" "$@"

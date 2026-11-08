@@ -1,32 +1,20 @@
-.PHONY: all build core companion test test-core test-companion test-tools install knowledge clean
+.PHONY: run build test clean reset
 
-all: build
+run:
+	./AlliedID
 
-build: core companion
+build:
+	dotnet build host/AlliedID/AlliedID.csproj -c Release -o .build --nologo -v quiet -clp:ErrorsOnly
+	touch .build/.stamp
 
-core:
-	cargo build --release --manifest-path core/Cargo.toml
-
-companion:
-	dotnet build companion/AlliedID.Companion.slnx -c Release --nologo
-
-test: test-core test-companion test-tools
-
-test-core:
+test:
 	cargo test --manifest-path core/Cargo.toml
-
-test-companion:
-	dotnet build companion/AlliedID.Companion.slnx -c Release --nologo -warnaserror
-
-test-tools:
-	python3 -m unittest discover -s tools/tests
-
-knowledge:
-	python3 tools/knowledge_builder.py knowledge/sources/basics --name allied-id-basics
-
-install:
-	scripts/install.sh
+	dotnet build host/AlliedID/AlliedID.csproj -c Release --nologo -v quiet -warnaserror
 
 clean:
 	cargo clean --manifest-path core/Cargo.toml
-	dotnet clean companion/AlliedID.Companion.slnx --nologo -v quiet
+	rm -rf .build host/AlliedID/bin host/AlliedID/obj
+
+# 생성된 데이터와 배운 것·기억을 모두 지우고 처음 상태로 (되돌릴 수 없음)
+reset:
+	rm -rf data/generated data/state

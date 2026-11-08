@@ -1,18 +1,13 @@
-# Rust
+# 빌드 결과
+.build/
 core/target/
+host/**/bin/
+host/**/obj/
 
-# .NET
-companion/**/bin/
-companion/**/obj/
-
-# Python
-__pycache__/
-*.pyc
-
-# 로컬 모델·생성된 팩 (용량이 크고 사용자별)
-*.gguf
-*.gguf.part
-*.jsonl.tmp
+# 실행 중 프로젝트 환경에서 만들어지는 데이터 (매번 새로 생성)
+data/generated/
+# 사용자별 상태: 인격체·기억·가르침
+data/state/
 
 # 에디터 설정·캐시 (VS Code IntelliSense DB는 1GB 이상)
 .vscode/

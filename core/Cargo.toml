@@ -1,18 +1,17 @@
 [package]
-name = "allied-id"
-version = "0.1.0"
+name = "allied-core"
+version = "0.2.0"
 edition = "2021"
-description = "Allied Identity (AlliedID) - offline-first personal identity partner"
+description = "Allied Identity 본체 — 인지 엔진 (의도 이해, 추론 루프, 지식, 학습)"
 publish = false
 
-[[bin]]
-name = "AlliedID"
-path = "src/main.rs"
+[lib]
+name = "allied_core"
+crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
-ureq = { version = "2", features = ["json"] }
 
 [profile.release]
 lto = true

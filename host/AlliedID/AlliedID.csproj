@@ -1,0 +1,28 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <InvariantGlobalization>true</InvariantGlobalization>
+    <AssemblyName>AlliedID</AssemblyName>
+    <RootNamespace>AlliedID</RootNamespace>
+    <Version>0.2.0</Version>
+
+    <CoreDir>$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)../../core'))</CoreDir>
+    <NativeLibName Condition="$([MSBuild]::IsOSPlatform('Windows'))">allied_core.dll</NativeLibName>
+    <NativeLibName Condition="$([MSBuild]::IsOSPlatform('OSX'))">liballied_core.dylib</NativeLibName>
+    <NativeLibName Condition="'$(NativeLibName)' == ''">liballied_core.so</NativeLibName>
+  </PropertyGroup>
+
+  <!-- 본체(Rust 엔진)를 먼저 빌드하고, 만들어진 네이티브 라이브러리를 출력 폴더에 함께 넣는다. -->
+  <Target Name="BuildAlliedCore" BeforeTargets="BeforeBuild">
+    <Exec Command="cargo build --release --quiet --manifest-path &quot;$(CoreDir)/Cargo.toml&quot;" />
+    <ItemGroup>
+      <None Include="$(CoreDir)/target/release/$(NativeLibName)" Link="$(NativeLibName)" CopyToOutputDirectory="PreserveNewest" />
+    </ItemGroup>
+  </Target>
+
+</Project>
